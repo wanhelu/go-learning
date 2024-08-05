@@ -3,14 +3,14 @@ package main
 import (
 	"context"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/connectivity"
-	"grpc-demo/product"
+	"google.golang.org/protobuf/types/known/emptypb"
 	"log"
 	"time"
 )
 
 const (
 	address = "localhost:12121"
+	method  = "/product.ProductInfo/addProduct"
 )
 
 func main() {
@@ -26,46 +26,29 @@ func main() {
 	//	}
 	//}()
 	defer conn.Close()
-	for {
-		state := conn.GetState()
-		for state != connectivity.Ready {
-			log.Println("before:" + state.String())
-			conn.Connect()
-			ctx, _ := context.WithTimeout(context.Background(), time.Second)
-			conn.WaitForStateChange(ctx, state)
-			state = conn.GetState()
-			log.Println("after:" + state.String())
-		}
-		time.Sleep(time.Second * 10)
-		//stream,err:=conn.NewStream(context.Background(),&grpc.StreamDesc{ServerStreams: false, ClientStreams: false},"/product.ProductInfo/addProduct")
-		//err=stream.SendMsg(&product.Product{Name: "1"})
-		//if err != nil {
-		//	log.Println("did not connect.", err)
-		//	return
-		//}
-	}
-
-	log.Println("success")
-}
-
-// 添加一个测试的商品
-func AddProduct(ctx context.Context, client product.ProductInfoClient) (id string) {
-	aMac := &product.Product{Name: "Mac Book Pro 2019", Description: "From Apple Inc."}
-	productId, err := client.AddProduct(ctx, aMac)
+	stream, err := conn.NewStream(context.Background(), &grpc.StreamDesc{ServerStreams: false, ClientStreams: false}, method)
+	err = stream.SendMsg(&emptypb.Empty{})
 	if err != nil {
-		log.Println("add product fail.", err)
+		log.Println("send failed", err)
 		return
 	}
-	log.Println("add product success, id = ", productId.Value)
-	return productId.Value
-}
-
-// 获取一个商品
-func GetProduct(ctx context.Context, client product.ProductInfoClient, id string) {
-	p, err := client.GerProduct(ctx, &product.ProductId{Value: id})
+	res := &emptypb.Empty{}
+	err = stream.RecvMsg(res)
 	if err != nil {
-		log.Println("get product err.", err)
+		log.Println("recv failed", err)
 		return
 	}
-	log.Printf("get prodcut success : %+v\n", p)
+	log.Println("res: %v", res)
+
+	err = stream.SendMsg(&emptypb.Empty{})
+	if err != nil {
+		log.Println("send failed", err)
+		return
+	}
+	err = stream.RecvMsg(res)
+	if err != nil {
+		log.Println("recv failed", err)
+		return
+	}
+	log.Println("res: %v", res)
 }
